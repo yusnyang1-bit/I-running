@@ -3,131 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>I-Running 3.0 Pro</title>
+    <title>I-Running 4.0 Data Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #0f172a; color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        .stat-value { font-size: 3.5rem; font-weight: 800; color: #10b981; line-height: 1; }
-        .card { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.5rem; }
+        body { background-color: #0f172a; color: white; font-family: sans-serif; }
+        .card { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 1rem; }
+        .active-tab { background-color: #10b981; color: white; }
     </style>
 </head>
-<body class="flex flex-col items-center justify-between min-h-screen p-8 pb-12">
+<body class="p-6 flex flex-col items-center">
     
-    <div class="w-full text-center mt-4">
-        <h1 class="text-xs font-black tracking-[0.3em] text-emerald-500 opacity-80 mb-1">PRO TRACKER</h1>
-        <div id="status" class="text-[10px] text-gray-500 uppercase tracking-widest">等待啟動 GPS</div>
-    </div>
+    <h1 class="text-emerald-500 font-black tracking-widest text-xs mb-6">RUNNING ANALYTICS 4.0</h1>
 
-    <div class="text-center">
-        <div id="timer" class="stat-value mb-2">00:00</div>
-        <p class="text-gray-400 text-xs tracking-widest uppercase">Duration / 持續時間</p>
-    </div>
-
-    <div class="grid grid-cols-2 gap-4 w-full max-w-sm">
-        <div class="card p-6 text-center">
-            <div id="distance" class="text-3xl font-bold text-white">0.00</div>
-            <p class="text-gray-500 text-[10px] mt-1 uppercase tracking-wider">Distance / 公里</p>
+    <div class="card w-full max-w-sm p-6 mb-6 text-center">
+        <div id="timer" class="text-5xl font-black text-white mb-2">00:00</div>
+        <div class="flex justify-around mt-4">
+            <div>
+                <div id="distance" class="text-2xl font-bold">0.00</div>
+                <p class="text-gray-500 text-[10px] uppercase">Km</p>
+            </div>
+            <div>
+                <div id="status" class="text-sm font-bold text-amber-500">READY</div>
+                <p class="text-gray-500 text-[10px] uppercase">GPS Status</p>
+            </div>
         </div>
-        <div class="card p-6 text-center">
-            <div id="calories" class="text-3xl font-bold text-white">0</div>
-            <p class="text-gray-500 text-[10px] mt-1 uppercase tracking-wider">Calories / 卡路里</p>
-        </div>
+        <button id="mainBtn" onclick="toggleRun()" class="mt-6 w-full py-4 rounded-xl bg-emerald-500 font-bold shadow-lg active:scale-95 transition-all">START RUNNING</button>
     </div>
 
-    <div class="flex flex-col items-center gap-4 w-full">
-        <button id="mainBtn" onclick="toggleRun()" class="w-24 h-24 rounded-full bg-emerald-500 text-white font-black text-lg shadow-[0_0_30px_rgba(16,185,129,0.3)] active:scale-90 transition-all duration-300">
-            START
-        </button>
-        <p class="text-[10px] text-gray-600 italic">Version 3.0 - GPS Enabled</p>
+    <div class="card w-full max-w-sm p-4">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-sm font-bold">統計報表</h2>
+            <div class="flex gap-1">
+                <button onclick="updateChart('day')" id="btn-day" class="text-[10px] px-2 py-1 rounded card">日</button>
+                <button onclick="updateChart('week')" id="btn-week" class="text-[10px] px-2 py-1 rounded card">週</button>
+                <button onclick="updateChart('month')" id="btn-month" class="text-[10px] px-2 py-1 rounded card">月</button>
+            </div>
+        </div>
+        <canvas id="runChart" height="200"></canvas>
     </div>
 
     <script>
         let running = false;
-        let seconds = 0;
-        let timerInterval;
-        let watchID;
-        let totalDistance = 0;
-        let lastCoords = null;
+        let seconds = 0, timerInterval, watchID, totalDistance = 0, lastCoords = null;
+        let myChart;
+
+        // 初始化：從手機記憶體讀取舊數據
+        let runHistory = JSON.parse(localStorage.getItem('runHistory')) || [];
 
         function toggleRun() {
             const btn = document.getElementById('mainBtn');
-            const statusLabel = document.getElementById('status');
-            
             if (!running) {
-                // 開始
-                if ("geolocation" in navigator) {
-                    running = true;
-                    btn.innerText = 'STOP';
-                    btn.classList.replace('bg-emerald-500', 'bg-red-500');
-                    btn.classList.add('shadow-[0_0_30px_rgba(239,68,68,0.3)]');
-                    statusLabel.innerText = "正在搜尋 GPS 訊號...";
-                    
-                    // 重置
-                    seconds = 0;
-                    totalDistance = 0;
-                    lastCoords = null;
-                    document.getElementById('distance').innerText = "0.00";
-                    document.getElementById('calories').innerText = "0";
-
-                    timerInterval = setInterval(() => {
-                        seconds++;
-                        updateUI();
-                    }, 1000);
-
-                    watchID = navigator.geolocation.watchPosition(
-                        (position) => {
-                            statusLabel.innerText = "GPS 訊號追蹤中";
-                            const { latitude, longitude, accuracy } = position.coords;
-                            
-                            // 如果定位精度太差 (> 30公尺)，先忽略這次數據
-                            if (accuracy > 30) return;
-
-                            if (lastCoords) {
-                                const dist = calculateDistance(
-                                    lastCoords.latitude, lastCoords.longitude,
-                                    latitude, longitude
-                                );
-                                // 過濾小於 2 公尺的抖動，避免原地不動里程也會增加
-                                if (dist > 0.002) {
-                                    totalDistance += dist;
-                                    document.getElementById('distance').innerText = totalDistance.toFixed(2);
-                                    // 估算卡路里：體重 70kg 跑 1km 約消耗 70 大卡
-                                    document.getElementById('calories').innerText = Math.floor(totalDistance * 70);
-                                }
-                            }
-                            lastCoords = { latitude, longitude };
-                        },
-                        (err) => { statusLabel.innerText = "GPS 授權失敗"; },
-                        { enableHighAccuracy: true, distanceFilter: 1 }
-                    );
-                }
+                running = true;
+                btn.innerText = 'STOP & SAVE';
+                btn.className = 'mt-6 w-full py-4 rounded-xl bg-red-500 font-bold shadow-lg';
+                startTracking();
             } else {
-                // 停止
                 running = false;
-                btn.innerText = 'START';
-                btn.classList.replace('bg-red-500', 'bg-emerald-500');
-                statusLabel.innerText = "運動已結束";
-                clearInterval(timerInterval);
-                navigator.geolocation.clearWatch(watchID);
+                btn.innerText = 'START RUNNING';
+                btn.className = 'mt-6 w-full py-4 rounded-xl bg-emerald-500 font-bold shadow-lg';
+                stopAndSave();
             }
         }
 
-        function updateUI() {
-            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-            const s = (seconds % 60).toString().padStart(2, '0');
-            document.getElementById('timer').innerText = `${m}:${s}`;
+        function startTracking() {
+            seconds = 0; totalDistance = 0; lastCoords = null;
+            timerInterval = setInterval(() => {
+                seconds++;
+                document.getElementById('timer').innerText = new Date(seconds * 1000).toISOString().substr(14, 5);
+            }, 1000);
+
+            watchID = navigator.geolocation.watchPosition((p) => {
+                const { latitude, longitude, accuracy } = p.coords;
+                if (accuracy > 30) return;
+                document.getElementById('status').innerText = "TRACKING";
+                if (lastCoords) {
+                    const d = calculateDist(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
+                    if (d > 0.002) {
+                        totalDistance += d;
+                        document.getElementById('distance').innerText = totalDistance.toFixed(2);
+                    }
+                }
+                lastCoords = { latitude, longitude };
+            }, null, { enableHighAccuracy: true });
         }
 
-        function calculateDistance(lat1, lon1, lat2, lon2) {
+        function stopAndSave() {
+            clearInterval(timerInterval);
+            navigator.geolocation.clearWatch(watchID);
+            document.getElementById('status').innerText = "SAVED";
+
+            if (totalDistance > 0) {
+                runHistory.push({
+                    date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+                    distance: parseFloat(totalDistance.toFixed(2))
+                });
+                localStorage.setItem('runHistory', JSON.stringify(runHistory));
+                updateChart('day'); // 自動刷新圖表
+            }
+        }
+
+        function calculateDist(lat1, lon1, lat2, lon2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
+
+        // 圖表邏輯
+        function updateChart(mode) {
+            const ctx = document.getElementById('runChart').getContext('2d');
+            const dataMap = {};
+            
+            // 邏輯處理：按模式聚合數據
+            runHistory.forEach(item => {
+                dataMap[item.date] = (dataMap[item.date] || 0) + item.distance;
+            });
+
+            const labels = Object.keys(dataMap).sort().slice(-7); // 取最近7筆
+            const values = labels.map(l => dataMap[l]);
+
+            if (myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '累積公里',
+                        data: values,
+                        backgroundColor: '#10b981',
+                        borderRadius: 5
+                    }]
+                },
+                options: { 
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#334155' } } }
+                }
+            });
+
+            // 切換按鈕樣式
+            ['day', 'week', 'month'].forEach(m => document.getElementById('btn-'+m).className = (m===mode ? 'text-[10px] px-2 py-1 rounded active-tab' : 'text-[10px] px-2 py-1 rounded card'));
+        }
+
+        // 初始載入圖表
+        window.onload = () => updateChart('day');
     </script>
 </body>
 </html>
