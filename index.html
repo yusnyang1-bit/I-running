@@ -1,72 +1,204 @@
-<div class="grid grid-cols-2 gap-4 w-full mb-6">
-    <div class="glass p-4 rounded-3xl flex items-center justify-between">
-        <div>
-            <p class="text-[9px] text-gray-500 font-bold uppercase">Calories</p>
-            <span id="kcalDisplay" class="text-xl font-black tabular-nums">0</span>
-        </div>
-        <div class="text-[#FF9500]">🔥</div>
-    </div>
-    <div class="glass p-4 rounded-3xl flex items-center justify-between">
-        <div>
-            <p class="text-[9px] text-gray-500 font-bold uppercase">Avg Speed</p>
-            <span id="speedDisplay" class="text-xl font-black tabular-nums">0.0</span>
-        </div>
-        <div class="text-[#007AFF]">⚡</div>
-    </div>
-</div>
-
-<section class="mt-4">
-    <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Analytics</h3>
-        <div class="flex gap-2 glass p-1 rounded-xl">
-            <button onclick="updateChart('day')" class="tab-btn px-3 py-1 text-[10px] font-bold rounded-lg bg-[#34C759] text-black transition-all">DAY</button>
-            <button onclick="updateChart('week')" class="tab-btn px-3 py-1 text-[10px] font-bold rounded-lg text-gray-400">WEEK</button>
-            <button onclick="updateChart('month')" class="tab-btn px-3 py-1 text-[10px] font-bold rounded-lg text-gray-400">MONTH</button>
-        </div>
-    </div>
-    
-    <div class="glass p-5 rounded-[2.5rem] mb-6 relative overflow-hidden">
-        <div class="h-40 w-full">
-            <canvas id="runChart"></canvas>
-        </div>
-    </div>
-</section>
-
-<script>
-    // 新增核心邏輯片段
-    function updateMetrics() {
-        // 卡路里：假設 70kg, 1km 消耗約 72大卡
-        const kcal = (totalDist * 72.5).toFixed(1);
-        document.getElementById('kcalDisplay').innerText = kcal;
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>I-Running Neon Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --accent: #34C759; --bg: #000000; --glass: rgba(28, 28, 30, 0.8); }
+        body { background-color: var(--bg); color: white; font-family: -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+        .glass-card { background: var(--glass); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); border-radius: 2rem; }
         
-        // 時速：km/h
-        const speed = seconds > 0 ? (totalDist / (seconds / 3600)).toFixed(1) : "0.0";
-        document.getElementById('speedDisplay').innerText = speed;
-    }
+        /* 呼吸燈效果 */
+        .glow-pulse { animation: neon-glow 3s infinite ease-in-out; }
+        @keyframes neon-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(52, 199, 89, 0.1); }
+            50% { box-shadow: 0 0 40px rgba(52, 199, 89, 0.3); }
+        }
 
-    // 增強型 Chart 配置 (柱狀圖 + 動態切換)
-    function updateChart(period) {
-        // 切換 UI 樣式
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.className = 'tab-btn px-3 py-1 text-[10px] font-bold rounded-lg text-gray-400';
-        });
-        event.target.className = 'tab-btn px-3 py-1 text-[10px] font-bold rounded-lg bg-[#34C759] text-black';
-
-        // 模擬數據（實際開發可從 DB 統計）
-        const mockData = {
-            day: { labels: ['6am', '10am', '2pm', '6pm', '10pm'], data: [0, 2.4, 1.1, 4.5, 0.5] },
-            week: { labels: ['M', 'T', 'W', 'T', 'F', 'S', 'S'], data: [5, 8, 4, 10, 6, 12, 15] },
-            month: { labels: ['W1', 'W2', 'W3', 'W4'], data: [45, 52, 38, 65] }
-        };
-
-        const config = mockData[period];
+        .tab-active { background: var(--accent); color: black; font-weight: 800; transform: scale(1.05); }
+        .btn-pulse { animation: btn-glow 2s infinite; }
+        @keyframes btn-glow { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
         
-        myChart.data.labels = config.labels;
-        myChart.data.datasets[0].data = config.data;
-        myChart.data.datasets[0].type = 'bar'; // 改為柱狀圖增加視覺衝擊
-        myChart.update({
-            duration: 800,
-            easing: 'easeOutQuart'
-        });
-    }
-</script>
+        canvas { max-height: 180px !important; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen p-6 pb-20 overflow-x-hidden">
+
+    <header class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-xl font-black tracking-tighter">NEON RUN</h1>
+            <p class="text-[9px] text-emerald-500 font-bold tracking-[0.3em]">ACTIVE PERFORMANCE</p>
+        </div>
+        <div class="glass-card px-4 py-2 rounded-full flex items-center gap-2">
+            <div id="gpsDot" class="w-2 h-2 rounded-full bg-slate-700"></div>
+            <span id="gpsText" class="text-[9px] font-black text-gray-400 uppercase">Standby</span>
+        </div>
+    </header>
+
+    <div class="text-center mb-8">
+        <div id="timer" class="text-7xl font-thin tracking-tighter tabular-nums text-white">00:00</div>
+        <p class="text-[10px] text-gray-600 font-bold uppercase tracking-widest mt-1">Total Time</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-8">
+        <div class="glass-card p-5 text-center glow-pulse">
+            <div id="stepCount" class="text-3xl font-black">0</div>
+            <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">Steps</p>
+        </div>
+        <div class="glass-card p-5 text-center">
+            <div id="distCount" class="text-3xl font-black text-[#34C759]">0.00</div>
+            <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">KM</p>
+        </div>
+        <div class="glass-card p-5 text-center">
+            <div id="speedCount" class="text-3xl font-black italic">0.0</div>
+            <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">KM/H</p>
+        </div>
+        <div class="glass-card p-5 text-center">
+            <div id="calCount" class="text-3xl font-black text-orange-500">0</div>
+            <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">Kcal</p>
+        </div>
+    </div>
+
+    <div class="flex justify-center mb-12">
+        <button id="mainBtn" onclick="toggleRun()" class="w-20 h-20 rounded-full bg-[#34C759] text-black font-black text-xs shadow-2xl transition-all active:scale-90 btn-pulse">START</button>
+    </div>
+
+    <section class="glass-card p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xs font-black uppercase tracking-widest text-gray-400">Analytics</h3>
+            <div class="flex gap-1 bg-black/40 p-1 rounded-xl">
+                <button onclick="switchChart('day')" id="tab-day" class="px-3 py-1 text-[9px] rounded-lg transition-all tab-active">DAY</button>
+                <button onclick="switchChart('week')" id="tab-week" class="px-3 py-1 text-[9px] rounded-lg transition-all text-gray-500">WEEK</button>
+                <button onclick="switchChart('month')" id="tab-month" class="px-3 py-1 text-[9px] rounded-lg transition-all text-gray-500">MONTH</button>
+            </div>
+        </div>
+        <canvas id="runChart"></canvas>
+    </section>
+
+    <script>
+        let running = false, seconds = 0, timerInterval, watchID, totalDist = 0, lastCoords = null;
+        let steps = 0, lastAccel = 0, lastStepTime = 0, myChart;
+        let history = JSON.parse(localStorage.getItem('runHistory')) || [];
+
+        function toggleRun() {
+            const btn = document.getElementById('mainBtn');
+            const dot = document.getElementById('gpsDot');
+            if (!running) {
+                running = true;
+                btn.innerText = 'STOP';
+                btn.className = 'w-20 h-20 rounded-full bg-red-500 text-white font-black text-xs shadow-2xl transition-all active:scale-90';
+                dot.classList.add('bg-[#34C759]', 'glow-pulse');
+                startSession();
+            } else {
+                running = false;
+                btn.innerText = 'START';
+                btn.className = 'w-20 h-20 rounded-full bg-[#34C759] text-black font-black text-xs shadow-2xl transition-all active:scale-90 btn-pulse';
+                dot.classList.remove('bg-[#34C759]', 'glow-pulse');
+                stopSession();
+            }
+        }
+
+        function startSession() {
+            seconds = 0; totalDist = 0; steps = 0;
+            timerInterval = setInterval(() => {
+                seconds++;
+                document.getElementById('timer').innerText = new Date(seconds * 1000).toISOString().substr(14, 5);
+                // 計算平均時速 (KM/H)
+                if (seconds > 0) {
+                    let speed = (totalDist / (seconds / 3600)).toFixed(1);
+                    document.getElementById('speedCount').innerText = speed;
+                }
+            }, 1000);
+
+            watchID = navigator.geolocation.watchPosition((p) => {
+                const { latitude, longitude, accuracy } = p.coords;
+                if (accuracy > 35) return;
+                document.getElementById('gpsText').innerText = "Tracking";
+                if (lastCoords) {
+                    const d = calculate(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
+                    if (d > 0.002) { 
+                        totalDist += d; 
+                        document.getElementById('distCount').innerText = totalDist.toFixed(2);
+                        document.getElementById('calCount').innerText = Math.floor(totalDist * 65); // 估算熱量
+                    }
+                }
+                lastCoords = { latitude, longitude };
+            }, null, { enableHighAccuracy: true });
+
+            window.addEventListener('devicemotion', motionHandler);
+        }
+
+        function motionHandler(e) {
+            const acc = e.accelerationIncludingGravity;
+            let current = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
+            let now = Date.now();
+            if (Math.abs(current - lastAccel) > 13 && (now - lastStepTime > 260)) {
+                steps++; lastStepTime = now;
+                document.getElementById('stepCount').innerText = steps;
+            }
+            lastAccel = current;
+        }
+
+        function stopSession() {
+            clearInterval(timerInterval);
+            navigator.geolocation.clearWatch(watchID);
+            window.removeEventListener('devicemotion', motionHandler);
+            if (totalDist > 0 || steps > 5) {
+                history.unshift({ date: new Date().toLocaleDateString(), dist: totalDist, steps: steps, timestamp: Date.now() });
+                localStorage.setItem('runHistory', JSON.stringify(history));
+                switchChart('day');
+            }
+        }
+
+        function calculate(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function switchChart(mode) {
+            // 更新 UI 標籤
+            ['day', 'week', 'month'].forEach(m => {
+                document.getElementById('tab-'+m).className = m === mode ? 'px-3 py-1 text-[9px] rounded-lg transition-all tab-active' : 'px-3 py-1 text-[9px] rounded-lg transition-all text-gray-500';
+            });
+
+            const ctx = document.getElementById('runChart').getContext('2d');
+            let labels = [], data = [];
+
+            // 簡單模擬數據分類邏輯
+            const displayData = history.slice(0, 7).reverse();
+            labels = displayData.map(i => i.date.split('/')[1] + '/' + i.date.split('/')[2]);
+            data = displayData.map(i => i.dist);
+
+            if (myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'KM',
+                        data: data,
+                        backgroundColor: '#34C759',
+                        borderRadius: 8,
+                        barThickness: 12
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#444', font: { size: 8 } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } }
+                    }
+                }
+            });
+        }
+        window.onload = () => switchChart('day');
+    </script>
+</body>
+</html>
