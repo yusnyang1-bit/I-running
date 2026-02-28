@@ -3,149 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>I-Running 5.0 Pro Tracker</title>
+    <title>I-Running 6.0 Data King</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #0f172a; color: white; font-family: sans-serif; overflow-x: hidden; }
-        .card { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255,255,255,0.05); border-radius: 1.5rem; }
-        .stat-label { font-size: 10px; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase; }
-        .active-tab { background-color: #10b981; color: white; border: none; }
+        body { background-color: #0f172a; color: white; font-family: sans-serif; }
+        .card { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(255,255,255,0.05); border-radius: 1.2rem; }
+        .history-item { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 8px 0; }
     </style>
 </head>
-<body class="p-6 flex flex-col items-center min-h-screen">
+<body class="p-5 flex flex-col items-center min-h-screen">
     
-    <header class="w-full flex justify-between items-center mb-8">
-        <span class="text-emerald-500 font-black text-xs">V5.0 PRO</span>
-        <div id="status" class="text-[10px] bg-slate-800 px-3 py-1 rounded-full text-amber-500 font-bold">READY</div>
-    </header>
+    <div class="w-full max-w-sm flex justify-between items-center mb-6">
+        <span class="text-emerald-400 font-black text-[10px] tracking-tighter">I-RUNNING v6.0</span>
+        <div id="status" class="text-[9px] text-slate-500 font-mono">STANDBY</div>
+    </div>
 
-    <div class="w-full max-w-sm grid grid-cols-2 gap-4 mb-6">
-        <div class="card p-6 text-center shadow-xl">
-            <div id="stepCount" class="text-4xl font-black text-white">0</div>
-            <p class="stat-label mt-2">Steps / 步數</p>
+    <div class="w-full max-w-sm grid grid-cols-2 gap-3 mb-4">
+        <div class="card p-5 text-center">
+            <div id="stepDisplay" class="text-4xl font-black">0</div>
+            <p class="text-[10px] text-slate-500 mt-1 uppercase">Steps</p>
         </div>
-        <div class="card p-6 text-center shadow-xl">
-            <div id="distance" class="text-4xl font-black text-emerald-400">0.00</div>
-            <p class="stat-label mt-2">Km / 里程</p>
+        <div class="card p-5 text-center border-l-2 border-l-emerald-500/30">
+            <div id="distDisplay" class="text-4xl font-black text-emerald-400">0.00</div>
+            <p class="text-[10px] text-slate-500 mt-1 uppercase">Km</p>
         </div>
     </div>
 
-    <div class="mb-8 text-center">
-        <div id="timer" class="text-2xl font-mono font-medium text-slate-400">00:00</div>
-        <p class="stat-label">Duration / 時間</p>
+    <div class="w-full max-w-sm flex items-center justify-between mb-8 px-2">
+        <div id="timer" class="text-xl font-mono text-slate-400 tracking-tighter">00:00</div>
+        <button id="mainBtn" onclick="toggleRun()" class="px-8 py-3 rounded-full bg-emerald-500 font-black text-sm shadow-lg active:scale-90 transition-all">START</button>
     </div>
 
-    <button id="mainBtn" onclick="toggleRun()" class="w-24 h-24 rounded-full bg-emerald-500 text-white font-black text-lg shadow-[0_0_40px_rgba(16,185,129,0.2)] active:scale-90 transition-all mb-10">
-        START
-    </button>
-
-    <div class="card w-full max-w-sm p-4 mt-auto">
-        <div class="flex justify-between items-center mb-3">
-            <h2 class="text-xs font-bold text-slate-400">歷史趨勢 (Km)</h2>
-            <div class="flex gap-1">
-                <button onclick="updateChart('day')" id="btn-day" class="text-[9px] px-2 py-1 rounded card">日</button>
-                <button onclick="updateChart('week')" id="btn-week" class="text-[9px] px-2 py-1 rounded card">週</button>
+    <div class="card w-full max-w-sm p-4 overflow-hidden">
+        <div class="h-24 mb-4"><canvas id="runChart"></canvas></div>
+        <h2 class="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Recent Activity / 歷史紀錄</h2>
+        <div id="historyList" class="text-xs text-slate-300 max-h-32 overflow-y-auto">
             </div>
-        </div>
-        <div class="h-32">
-            <canvas id="runChart"></canvas>
-        </div>
     </div>
 
     <script>
         let running = false;
-        let seconds = 0, timerInterval, watchID, totalDistance = 0, lastCoords = null;
-        let steps = 0, lastAccel = 0, stepThreshold = 12; // 震動門檻
+        let seconds = 0, timerInterval, watchID, totalDist = 0, lastCoords = null;
+        let steps = 0, lastAccel = 0, lastStepTime = 0;
         let myChart;
-        let runHistory = JSON.parse(localStorage.getItem('runHistory')) || [];
+        let history = JSON.parse(localStorage.getItem('runHistory')) || [];
 
         function toggleRun() {
             const btn = document.getElementById('mainBtn');
             if (!running) {
-                // 請求步數權限 (iOS 13+ 需要)
+                // 請求權限
                 if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                    DeviceMotionEvent.requestPermission().then(state => {
-                        if (state === 'granted') startRunning();
-                    });
-                } else {
-                    startRunning();
-                }
-            } else {
-                stopRunning();
-            }
+                    DeviceMotionEvent.requestPermission().then(s => { if(s==='granted') start(); });
+                } else { start(); }
+            } else { stop(); }
         }
 
-        function startRunning() {
+        function start() {
             running = true;
-            const btn = document.getElementById('mainBtn');
-            btn.innerText = 'STOP';
-            btn.className = 'w-24 h-24 rounded-full bg-red-500 text-white font-black text-lg active:scale-90 transition-all mb-10';
+            document.getElementById('mainBtn').innerText = "FINISH";
+            document.getElementById('mainBtn').className = "px-8 py-3 rounded-full bg-red-500 font-black text-sm shadow-lg";
+            seconds = 0; totalDist = 0; steps = 0; lastCoords = null;
+            document.getElementById('stepDisplay').innerText = "0";
+            document.getElementById('distDisplay').innerText = "0.00";
             
-            // 重置數據
-            seconds = 0; totalDistance = 0; steps = 0; lastCoords = null;
-            document.getElementById('stepCount').innerText = "0";
-            document.getElementById('distance').innerText = "0.00";
-
-            // 計時
             timerInterval = setInterval(() => {
                 seconds++;
                 document.getElementById('timer').innerText = new Date(seconds * 1000).toISOString().substr(14, 5);
             }, 1000);
 
-            // GPS 追蹤
             watchID = navigator.geolocation.watchPosition((p) => {
                 const { latitude, longitude, accuracy } = p.coords;
                 if (accuracy > 30) return;
-                document.getElementById('status').innerText = "TRACKING";
+                document.getElementById('status').innerText = "GPS ACTIVE";
                 if (lastCoords) {
-                    const d = calculateDist(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
-                    if (d > 0.002) {
-                        totalDistance += d;
-                        document.getElementById('distance').innerText = totalDistance.toFixed(2);
-                    }
+                    const d = calculate(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
+                    if (d > 0.002) { totalDist += d; document.getElementById('distDisplay').innerText = totalDist.toFixed(2); }
                 }
                 lastCoords = { latitude, longitude };
             }, null, { enableHighAccuracy: true });
 
-            // 步數偵測 (震動計演算法)
-            window.addEventListener('devicemotion', handleMotion);
+            window.addEventListener('devicemotion', motionHandler);
         }
 
-        function handleMotion(event) {
-            const acc = event.accelerationIncludingGravity;
-            let currentAccel = Math.sqrt(acc.x*acc.x + acc.y*acc.y + acc.z*acc.z);
-            let delta = Math.abs(currentAccel - lastAccel);
-            if (delta > stepThreshold) {
+        function motionHandler(e) {
+            const acc = e.accelerationIncludingGravity;
+            let currentAccel = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
+            let now = Date.now();
+            // 優化演算法：震動幅度 > 13 且兩步之間間隔 > 250ms (防止手抖誤判)
+            if (Math.abs(currentAccel - lastAccel) > 13 && (now - lastStepTime > 250)) {
                 steps++;
-                document.getElementById('stepCount').innerText = steps;
+                lastStepTime = now;
+                document.getElementById('stepDisplay').innerText = steps;
             }
             lastAccel = currentAccel;
         }
 
-        function stopRunning() {
+        function stop() {
             running = false;
-            const btn = document.getElementById('mainBtn');
-            btn.innerText = 'START';
-            btn.className = 'w-24 h-24 rounded-full bg-emerald-500 text-white font-black text-lg active:scale-90 transition-all mb-10';
-            
+            document.getElementById('mainBtn').innerText = "START";
+            document.getElementById('mainBtn').className = "px-8 py-3 rounded-full bg-emerald-500 font-black text-sm shadow-lg";
             clearInterval(timerInterval);
             navigator.geolocation.clearWatch(watchID);
-            window.removeEventListener('devicemotion', handleMotion);
-            document.getElementById('status').innerText = "SAVED";
-
-            if (totalDistance > 0 || steps > 0) {
-                runHistory.push({
-                    date: new Date().toISOString().split('T')[0],
-                    distance: parseFloat(totalDistance.toFixed(2)),
+            window.removeEventListener('devicemotion', motionHandler);
+            
+            if (totalDist > 0 || steps > 10) {
+                history.unshift({
+                    date: new Date().toLocaleDateString(),
+                    dist: totalDist.toFixed(2),
                     steps: steps
                 });
-                localStorage.setItem('runHistory', JSON.stringify(runHistory));
-                updateChart('day');
+                if(history.length > 10) history.pop();
+                localStorage.setItem('runHistory', JSON.stringify(history));
+                renderUI();
             }
         }
 
-        function calculateDist(lat1, lon1, lat2, lon2) {
+        function calculate(lat1, lon1, lat2, lon2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -153,48 +127,28 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        function updateChart(mode) {
+        function renderUI() {
+            const list = document.getElementById('historyList');
+            list.innerHTML = history.map(i => `
+                <div class="history-item flex justify-between">
+                    <span>${i.date}</span>
+                    <span class="font-bold text-emerald-400">${i.dist} km / ${i.steps} 步</span>
+                </div>
+            `).join('');
+
             const ctx = document.getElementById('runChart').getContext('2d');
-            const dataMap = {};
-            runHistory.forEach(item => {
-                dataMap[item.date] = (dataMap[item.date] || 0) + item.distance;
-            });
-
-            const labels = Object.keys(dataMap).sort().slice(-7);
-            const values = labels.map(l => dataMap[l]);
-
             if (myChart) myChart.destroy();
             myChart = new Chart(ctx, {
-                type: 'line', // 改為折線圖更省空間
+                type: 'line',
                 data: {
-                    labels: labels,
-                    datasets: [{
-                        data: values,
-                        borderColor: '#10b981',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        fill: true,
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        tension: 0.4
-                    }]
+                    labels: history.map(i => i.date).reverse(),
+                    datasets: [{ data: history.map(i => i.dist).reverse(), borderColor: '#10b981', fill: true, backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.4 }]
                 },
-                options: { 
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { 
-                        x: { display: false },
-                        y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } } 
-                    }
-                }
-            });
-
-            ['day', 'week'].forEach(m => {
-                const b = document.getElementById('btn-'+m);
-                if(b) b.className = (m===mode ? 'text-[9px] px-2 py-1 rounded active-tab' : 'text-[9px] px-2 py-1 rounded card');
+                options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
             });
         }
 
-        window.onload = () => updateChart('day');
+        window.onload = renderUI;
     </script>
 </body>
 </html>
