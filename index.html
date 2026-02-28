@@ -1,193 +1,296 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>I-Running V10.0 HyperGlow</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root { --accent: #34C759; --bg: #000000; }
-        body { background-color: var(--bg); color: white; font-family: -apple-system, sans-serif; overflow-x: hidden; }
-        
-        /* 大範圍鮮豔呼吸光暈 */
-        @keyframes hyper-glow {
-            0%, 100% { box-shadow: 0 0 40px rgba(52, 199, 89, 0.2), 0 0 80px rgba(52, 199, 89, 0.1); background: rgba(52, 199, 89, 0.05); }
-            50% { box-shadow: 0 0 70px rgba(52, 199, 89, 0.6), 0 0 120px rgba(52, 199, 89, 0.3); background: rgba(52, 199, 89, 0.15); }
-        }
-        .active-session { animation: hyper-glow 2.5s infinite ease-in-out; border: 1px solid var(--accent); }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>I-Running V10 PRO</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        /* GPS 專屬呼吸燈 */
-        @keyframes gps-pulse {
-            0%, 100% { opacity: 0.3; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.2); box-shadow: 0 0 15px var(--accent); }
-        }
-        .gps-active { animation: gps-pulse 1.5s infinite; background-color: var(--accent) !important; }
+<style>
+:root { --accent: #34C759; --bg: #000; }
 
-        .glass { background: rgba(28, 28, 30, 0.8); backdrop-filter: blur(20px); border-radius: 2rem; border: 1px solid rgba(255,255,255,0.05); }
-        .stat-value { font-variant-numeric: tabular-nums; letter-spacing: -0.05em; }
-    </style>
+body{
+background:#000;
+color:white;
+font-family:-apple-system,system-ui,sans-serif;
+overflow:hidden;
+}
+
+/* 動態流光背景 */
+body::before{
+content:"";
+position:fixed;
+width:200%;
+height:200%;
+background:radial-gradient(circle at 30% 30%, rgba(52,199,89,0.2), transparent 40%),
+radial-gradient(circle at 70% 70%, rgba(0,255,200,0.15), transparent 40%);
+animation:bgMove 15s linear infinite;
+z-index:-1;
+}
+
+@keyframes bgMove{
+0%{transform:translate(0,0);}
+50%{transform:translate(-25%, -25%);}
+100%{transform:translate(0,0);}
+}
+
+.glass{
+background:rgba(25,25,25,0.85);
+backdrop-filter:blur(20px);
+border-radius:1.5rem;
+border:1px solid rgba(255,255,255,0.08);
+}
+
+/* 超強霓虹呼吸 */
+@keyframes ultraPulse{
+0%{box-shadow:0 0 20px #34C759,0 0 40px #34C759;}
+50%{box-shadow:0 0 60px #34C759,0 0 120px #00ffcc;}
+100%{box-shadow:0 0 20px #34C759,0 0 40px #34C759;}
+}
+
+.activeGlow{
+animation:ultraPulse 1.5s infinite ease-in-out;
+}
+
+/* GPS 呼吸 */
+@keyframes gpsBeat{
+0%{transform:scale(1);opacity:.6;}
+50%{transform:scale(2);opacity:1;}
+100%{transform:scale(1);opacity:.6;}
+}
+
+.gpsActive{
+animation:gpsBeat 1.3s infinite;
+}
+</style>
 </head>
-<body class="flex flex-col min-h-screen p-6 pb-10">
 
-    <header class="flex justify-between items-center mb-10">
-        <div>
-            <h1 class="text-2xl font-black italic tracking-tighter">I-RUNNING</h1>
-            <span class="text-[9px] text-emerald-500 font-bold tracking-[0.2em]">V10.0 HYPER-GLOW</span>
-        </div>
-        <div class="glass px-4 py-2 flex items-center gap-3">
-            <div id="gpsDot" class="w-2 h-2 rounded-full bg-gray-700 transition-all"></div>
-            <span id="gpsLabel" class="text-[10px] font-black text-gray-500 uppercase">GPS Off</span>
-        </div>
-    </header>
+<body class="p-6 flex flex-col min-h-screen">
 
-    <main class="flex-grow flex flex-col items-center">
-        <div id="timer" class="text-7xl font-thin mb-12 stat-value">00:00</div>
+<header class="flex justify-between mb-6">
+<div>
+<h1 class="text-2xl font-black italic">I-RUNNING</h1>
+<span class="text-xs text-emerald-400">V10 PRO</span>
+</div>
+<div class="glass px-3 py-1 flex items-center gap-2">
+<div id="gpsDot" class="w-2 h-2 rounded-full bg-red-500"></div>
+<span class="text-xs text-gray-400">GPS</span>
+</div>
+</header>
 
-        <div class="grid grid-cols-2 gap-4 w-full max-w-sm mb-10">
-            <div id="stepCard" class="glass p-6 text-center transition-all duration-700">
-                <div id="stepCount" class="text-4xl font-black">0</div>
-                <p class="text-[10px] text-gray-500 font-bold uppercase mt-2">Steps</p>
-            </div>
-            <div id="distCard" class="glass p-6 text-center transition-all duration-700">
-                <div id="distCount" class="text-4xl font-black text-[#34C759]">0.00</div>
-                <p class="text-[10px] text-gray-500 font-bold uppercase mt-2">Km</p>
-            </div>
-        </div>
+<div class="text-center mb-6">
+<div id="timer" class="text-6xl font-light">00:00</div>
+<div class="text-xs text-gray-500">Duration</div>
+</div>
 
-        <button id="mainBtn" onclick="toggleRun()" class="w-24 h-24 rounded-full bg-[#34C759] text-black font-black text-sm shadow-2xl active:scale-90 transition-all">
-            START
-        </button>
+<div class="grid grid-cols-2 gap-3 mb-6">
+<div id="stepCard" class="glass p-4 text-center">
+<div id="stepCount" class="text-2xl font-black">0</div>
+<div class="text-xs text-gray-500">Steps</div>
+</div>
 
-        <div class="grid grid-cols-2 gap-8 mt-12 w-full max-w-xs">
-            <div class="text-center">
-                <div id="speedCount" class="text-2xl font-bold stat-value">0.0</div>
-                <p class="text-[9px] text-gray-600 font-bold uppercase">Avg Speed</p>
-            </div>
-            <div class="text-center">
-                <div id="calCount" class="text-2xl font-bold text-orange-500 stat-value">0</div>
-                <p class="text-[9px] text-gray-600 font-bold uppercase">Calories</p>
-            </div>
-        </div>
-    </main>
+<div id="distCard" class="glass p-4 text-center">
+<div id="distCount" class="text-2xl font-black text-green-400">0.00</div>
+<div class="text-xs text-gray-500">Distance (Km)</div>
+</div>
 
-    <section class="mt-10 glass p-5">
-        <div class="flex justify-between items-center mb-4">
-            <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Performance History</p>
-        </div>
-        <div class="h-32"><canvas id="runChart"></canvas></div>
-    </section>
+<div class="glass p-4 text-center">
+<div id="speedCount" class="text-2xl font-black">0.0</div>
+<div class="text-xs text-gray-500">Avg Speed</div>
+</div>
 
-    <script>
-        let running = false, seconds = 0, timerInterval, watchID, totalDist = 0, lastCoords = null;
-        let steps = 0, lastAccel = 0, lastStepTime = 0, myChart;
-        let history = JSON.parse(localStorage.getItem('runHistory')) || [];
+<div class="glass p-4 text-center">
+<div id="paceCount" class="text-2xl font-black text-blue-400">0'00"</div>
+<div class="text-xs text-gray-500">Pace /km</div>
+</div>
+</div>
 
-        // 語音功能
-        function speak(text) {
-            const msg = new SpeechSynthesisUtterance(text);
-            msg.lang = 'zh-TW';
-            msg.rate = 1.0;
-            window.speechSynthesis.speak(msg);
-        }
+<div class="flex justify-center mb-8">
+<button id="mainBtn" onclick="toggleRun()" class="w-20 h-20 rounded-full bg-green-400 text-black font-bold shadow-xl active:scale-90 transition">
+START
+</button>
+</div>
 
-        function toggleRun() {
-            const btn = document.getElementById('mainBtn');
-            const gpsDot = document.getElementById('gpsDot');
-            const gpsLabel = document.getElementById('gpsLabel');
-            const cards = [document.getElementById('stepCard'), document.getElementById('distCard')];
+<section class="glass p-4 mt-auto">
+<h3 class="text-xs text-gray-400 mb-2">History</h3>
+<canvas id="runChart" height="150"></canvas>
+</section>
 
-            if (!running) {
-                running = true;
-                btn.innerText = 'STOP'; btn.style.backgroundColor = '#EF4444'; btn.style.color = 'white';
-                gpsDot.classList.add('gps-active');
-                gpsLabel.innerText = 'Tracking'; gpsLabel.style.color = '#34C759';
-                cards.forEach(c => c.classList.add('active-session'));
-                speak("開始運動，祝你跑得愉快");
-                startWork();
-            } else {
-                running = false;
-                btn.innerText = 'START'; btn.style.backgroundColor = '#34C759'; btn.style.color = 'black';
-                gpsDot.classList.remove('gps-active');
-                gpsLabel.innerText = 'Saved'; gpsLabel.style.color = '#666';
-                cards.forEach(c => c.classList.remove('active-session'));
-                speak("運動結束，已為你儲存紀錄");
-                stopWork();
-            }
-        }
+<script>
 
-        function startWork() {
-            seconds = 0; totalDist = 0; steps = 0;
-            timerInterval = setInterval(() => {
-                seconds++;
-                document.getElementById('timer').innerText = new Date(seconds * 1000).toISOString().substr(14, 5);
-                if(seconds % 3 === 0 && totalDist > 0) {
-                    document.getElementById('speedCount').innerText = (totalDist / (seconds/3600)).toFixed(1);
-                }
-            }, 1000);
+let running=false;
+let seconds=0;
+let timerInterval;
+let watchID;
+let totalDist=0;
+let lastCoords=null;
+let steps=0;
+let lastAccel=0;
+let lastStepTime=0;
+let lastAnnounceKm=0;
+let idleSeconds=0;
+let history=JSON.parse(localStorage.getItem('runHistory'))||[];
+let myChart;
 
-            watchID = navigator.geolocation.watchPosition(p => {
-                const { latitude, longitude, accuracy } = p.coords;
-                if (accuracy > 30) return;
-                if (lastCoords) {
-                    const d = calculate(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
-                    if (d > 0.002) {
-                        totalDist += d;
-                        document.getElementById('distCount').innerText = totalDist.toFixed(2);
-                        document.getElementById('calCount').innerText = Math.floor(totalDist * 65);
-                    }
-                }
-                lastCoords = { latitude, longitude };
-            }, null, { enableHighAccuracy: true });
+/* 語音 */
+function speak(text){
+const msg=new SpeechSynthesisUtterance(text);
+msg.lang='zh-TW';
+window.speechSynthesis.speak(msg);
+}
 
-            window.addEventListener('devicemotion', motion);
-        }
+/* 切換 */
+function toggleRun(){
+const btn=document.getElementById('mainBtn');
+const gpsDot=document.getElementById('gpsDot');
+const cards=[stepCard,distCard];
 
-        function motion(e) {
-            let acc = e.accelerationIncludingGravity;
-            let current = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
-            let now = Date.now();
-            if (Math.abs(current - lastAccel) > 13 && (now - lastStepTime > 260)) {
-                steps++; lastStepTime = now;
-                document.getElementById('stepCount').innerText = steps;
-            }
-            lastAccel = current;
-        }
+if(!running){
+running=true;
+btn.innerText='STOP';
+btn.classList.add('activeGlow');
+gpsDot.classList.remove('bg-red-500');
+gpsDot.classList.add('bg-green-400','gpsActive');
+cards.forEach(c=>c.classList.add('activeGlow'));
+startRun();
+}else{
+running=false;
+btn.innerText='START';
+btn.classList.remove('activeGlow');
+gpsDot.classList.remove('gpsActive');
+gpsDot.classList.add('bg-red-500');
+cards.forEach(c=>c.classList.remove('activeGlow'));
+stopRun();
+}
+}
 
-        function stopWork() {
-            clearInterval(timerInterval);
-            navigator.geolocation.clearWatch(watchID);
-            window.removeEventListener('devicemotion', motion);
-            if (totalDist > 0 || steps > 5) {
-                const date = new Date();
-                history.unshift({ date: (date.getMonth()+1)+'/'+date.getDate(), dist: parseFloat(totalDist.toFixed(2)) });
-                localStorage.setItem('runHistory', JSON.stringify(history.slice(0,7)));
-                renderChart();
-            }
-        }
+/* 開始 */
+function startRun(){
+seconds=0; totalDist=0; steps=0; lastAnnounceKm=0; idleSeconds=0;
 
-        function calculate(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
+speak("開始跑步，加油");
 
-        function renderChart() {
-            const ctx = document.getElementById('runChart').getContext('2d');
-            const data = [...history].reverse();
-            if (myChart) myChart.destroy();
-            myChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.map(d => d.date),
-                    datasets: [{ data: data.map(d => d.dist), backgroundColor: '#34C759', borderRadius: 4, barThickness: 10 }]
-                },
-                options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#444', font: { size: 9 } } }, y: { display: false } } }
-            });
-        }
-        window.onload = renderChart;
-    </script>
+timerInterval=setInterval(()=>{
+seconds++;
+timer.innerText=new Date(seconds*1000).toISOString().substr(14,5);
+
+if(totalDist>0){
+let speed=(totalDist/(seconds/3600));
+speedCount.innerText=speed.toFixed(1);
+
+let pace=(60/speed);
+if(isFinite(pace)){
+let m=Math.floor(pace);
+let s=Math.floor((pace-m)*60);
+paceCount.innerText=`${m}'${s.toString().padStart(2,'0')}"`;
+}
+}
+
+if(idleSeconds>10){
+speak("已自動暫停");
+clearInterval(timerInterval);
+}
+
+},1000);
+
+watchID=navigator.geolocation.watchPosition(p=>{
+const {latitude,longitude,accuracy}=p.coords;
+if(accuracy>35)return;
+
+if(lastCoords){
+const d=calc(lastCoords.latitude,lastCoords.longitude,latitude,longitude);
+if(d>0.002){
+totalDist+=d;
+distCount.innerText=totalDist.toFixed(2);
+idleSeconds=0;
+
+let currentKm=Math.floor(totalDist);
+if(currentKm>lastAnnounceKm){
+lastAnnounceKm=currentKm;
+speak(`已跑 ${currentKm} 公里`);
+}
+}
+}else{
+idleSeconds++;
+}
+
+lastCoords={latitude,longitude};
+
+},{enableHighAccuracy:true});
+
+window.addEventListener('devicemotion',motion);
+}
+
+/* 計算距離 */
+function calc(lat1,lon1,lat2,lon2){
+const R=6371;
+const dLat=(lat2-lat1)*Math.PI/180;
+const dLon=(lon2-lon1)*Math.PI/180;
+const a=Math.sin(dLat/2)**2+
+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
+Math.sin(dLon/2)**2;
+return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+/* 計步 */
+function motion(e){
+let acc=e.accelerationIncludingGravity;
+let cur=Math.sqrt(acc.x**2+acc.y**2+acc.z**2);
+let now=Date.now();
+if(Math.abs(cur-lastAccel)>13 && now-lastStepTime>250){
+steps++;
+stepCount.innerText=steps;
+lastStepTime=now;
+}
+lastAccel=cur;
+}
+
+/* 停止 */
+function stopRun(){
+clearInterval(timerInterval);
+navigator.geolocation.clearWatch(watchID);
+window.removeEventListener('devicemotion',motion);
+
+if(totalDist>0.1){
+history.unshift({
+date:new Date().toLocaleDateString(),
+dist:parseFloat(totalDist.toFixed(2))
+});
+if(history.length>10)history.pop();
+localStorage.setItem('runHistory',JSON.stringify(history));
+updateChart();
+}
+
+speak(`本次距離 ${totalDist.toFixed(2)} 公里，步數 ${steps} 步，太棒了`);
+}
+
+/* 圖表 */
+function updateChart(){
+const ctx=document.getElementById('runChart');
+if(myChart)myChart.destroy();
+myChart=new Chart(ctx,{
+type:'bar',
+data:{
+labels:history.map(h=>h.date),
+datasets:[{
+data:history.map(h=>h.dist),
+backgroundColor:'#34C759',
+borderRadius:6
+}]
+},
+options:{
+plugins:{legend:{display:false}},
+scales:{
+x:{ticks:{color:'#666'}},
+y:{beginAtZero:true,ticks:{color:'#666'}}
+}
+}
+});
+}
+
+updateChart();
+
+</script>
 </body>
 </html>
