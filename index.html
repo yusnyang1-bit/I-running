@@ -3,76 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>I-Running Neon Pro</title>
+    <title>I-Running V9.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --accent: #34C759; --bg: #000000; --glass: rgba(28, 28, 30, 0.8); }
-        body { background-color: var(--bg); color: white; font-family: -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
-        .glass-card { background: var(--glass); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); border-radius: 2rem; }
+        :root { --accent: #34C759; --bg: #000000; --card: rgba(25, 25, 25, 0.9); }
+        body { background-color: var(--bg); color: white; font-family: -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        .glass-card { background: var(--card); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 1.5rem; }
         
-        /* 呼吸燈效果 */
-        .glow-pulse { animation: neon-glow 3s infinite ease-in-out; }
-        @keyframes neon-glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(52, 199, 89, 0.1); }
-            50% { box-shadow: 0 0 40px rgba(52, 199, 89, 0.3); }
+        /* 強化呼吸燈動畫 */
+        @keyframes neon-pulse {
+            0% { box-shadow: 0 0 5px rgba(52, 199, 89, 0.2), inset 0 0 5px rgba(52, 199, 89, 0.1); }
+            50% { box-shadow: 0 0 25px rgba(52, 199, 89, 0.5), inset 0 0 10px rgba(52, 199, 89, 0.2); }
+            100% { box-shadow: 0 0 5px rgba(52, 199, 89, 0.2), inset 0 0 5px rgba(52, 199, 89, 0.1); }
         }
-
-        .tab-active { background: var(--accent); color: black; font-weight: 800; transform: scale(1.05); }
-        .btn-pulse { animation: btn-glow 2s infinite; }
-        @keyframes btn-glow { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
+        .active-glow { animation: neon-pulse 2s infinite ease-in-out; border-color: rgba(52, 199, 89, 0.5); }
         
-        canvas { max-height: 180px !important; }
+        .tab-btn { font-size: 10px; padding: 4px 12px; border-radius: 8px; color: #666; transition: all 0.3s; }
+        .tab-btn.active { background: var(--accent); color: black; font-weight: bold; }
+        
+        canvas { max-height: 160px !important; }
     </style>
 </head>
-<body class="flex flex-col min-h-screen p-6 pb-20 overflow-x-hidden">
+<body class="flex flex-col min-h-screen p-6 pb-12">
 
-    <header class="flex justify-between items-center mb-8">
+    <header class="flex justify-between items-start mb-8">
         <div>
-            <h1 class="text-xl font-black tracking-tighter">NEON RUN</h1>
-            <p class="text-[9px] text-emerald-500 font-bold tracking-[0.3em]">ACTIVE PERFORMANCE</p>
+            <h1 class="text-2xl font-black tracking-tighter italic">I-RUNNING</h1>
+            <span class="text-[9px] bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">VERSION 9.0 - PRECISION</span>
         </div>
-        <div class="glass-card px-4 py-2 rounded-full flex items-center gap-2">
-            <div id="gpsDot" class="w-2 h-2 rounded-full bg-slate-700"></div>
-            <span id="gpsText" class="text-[9px] font-black text-gray-400 uppercase">Standby</span>
+        <div id="gpsStatus" class="glass-card px-3 py-1 flex items-center gap-2">
+            <div id="gpsDot" class="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+            <span class="text-[9px] font-bold text-gray-500 uppercase">GPS</span>
         </div>
     </header>
 
     <div class="text-center mb-8">
-        <div id="timer" class="text-7xl font-thin tracking-tighter tabular-nums text-white">00:00</div>
-        <p class="text-[10px] text-gray-600 font-bold uppercase tracking-widest mt-1">Total Time</p>
+        <div id="timer" class="text-7xl font-light tabular-nums tracking-tighter">00:00</div>
+        <p class="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em] mt-2">Duration</p>
     </div>
 
-    <div class="grid grid-cols-2 gap-4 mb-8">
-        <div class="glass-card p-5 text-center glow-pulse">
+    <div class="grid grid-cols-2 gap-3 mb-8">
+        <div id="stepCard" class="glass-card p-5 text-center transition-all">
             <div id="stepCount" class="text-3xl font-black">0</div>
-            <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">Steps</p>
+            <p class="text-[9px] text-gray-500 font-bold uppercase mt-1">Steps</p>
         </div>
-        <div class="glass-card p-5 text-center">
+        <div id="distCard" class="glass-card p-5 text-center transition-all">
             <div id="distCount" class="text-3xl font-black text-[#34C759]">0.00</div>
-            <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">KM</p>
+            <p class="text-[9px] text-gray-500 font-bold uppercase mt-1">Distance (Km)</p>
         </div>
         <div class="glass-card p-5 text-center">
-            <div id="speedCount" class="text-3xl font-black italic">0.0</div>
-            <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">KM/H</p>
+            <div id="speedCount" class="text-3xl font-black">0.0</div>
+            <p class="text-[9px] text-gray-500 font-bold uppercase mt-1">Avg Speed</p>
         </div>
         <div class="glass-card p-5 text-center">
             <div id="calCount" class="text-3xl font-black text-orange-500">0</div>
-            <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">Kcal</p>
+            <p class="text-[9px] text-gray-500 font-bold uppercase mt-1">Calories</p>
         </div>
     </div>
 
-    <div class="flex justify-center mb-12">
-        <button id="mainBtn" onclick="toggleRun()" class="w-20 h-20 rounded-full bg-[#34C759] text-black font-black text-xs shadow-2xl transition-all active:scale-90 btn-pulse">START</button>
+    <div class="flex justify-center mb-10">
+        <button id="mainBtn" onclick="toggleRun()" class="w-20 h-20 rounded-full bg-[#34C759] text-black font-black text-sm shadow-2xl active:scale-90 transition-all">START</button>
     </div>
 
-    <section class="glass-card p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-xs font-black uppercase tracking-widest text-gray-400">Analytics</h3>
-            <div class="flex gap-1 bg-black/40 p-1 rounded-xl">
-                <button onclick="switchChart('day')" id="tab-day" class="px-3 py-1 text-[9px] rounded-lg transition-all tab-active">DAY</button>
-                <button onclick="switchChart('week')" id="tab-week" class="px-3 py-1 text-[9px] rounded-lg transition-all text-gray-500">WEEK</button>
-                <button onclick="switchChart('month')" id="tab-month" class="px-3 py-1 text-[9px] rounded-lg transition-all text-gray-500">MONTH</button>
+    <section class="glass-card p-5 mt-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-widest">History Analytics</h3>
+            <div class="flex gap-1 bg-black/50 p-1 rounded-lg">
+                <button onclick="updateChart('day')" id="btn-day" class="tab-btn active">DAY</button>
+                <button onclick="updateChart('week')" id="btn-week" class="tab-btn">WEEK</button>
+                <button onclick="updateChart('month')" id="btn-month" class="tab-btn">MONTH</button>
             </div>
         </div>
         <canvas id="runChart"></canvas>
@@ -86,53 +86,54 @@
         function toggleRun() {
             const btn = document.getElementById('mainBtn');
             const dot = document.getElementById('gpsDot');
+            const cards = [document.getElementById('stepCard'), document.getElementById('distCard')];
+
             if (!running) {
                 running = true;
                 btn.innerText = 'STOP';
-                btn.className = 'w-20 h-20 rounded-full bg-red-500 text-white font-black text-xs shadow-2xl transition-all active:scale-90';
-                dot.classList.add('bg-[#34C759]', 'glow-pulse');
-                startSession();
+                btn.style.backgroundColor = '#EF4444'; btn.style.color = 'white';
+                dot.style.backgroundColor = '#34C759';
+                cards.forEach(c => c.classList.add('active-glow'));
+                startRun();
             } else {
                 running = false;
                 btn.innerText = 'START';
-                btn.className = 'w-20 h-20 rounded-full bg-[#34C759] text-black font-black text-xs shadow-2xl transition-all active:scale-90 btn-pulse';
-                dot.classList.remove('bg-[#34C759]', 'glow-pulse');
-                stopSession();
+                btn.style.backgroundColor = '#34C759'; btn.style.color = 'black';
+                dot.style.backgroundColor = '#EF4444';
+                cards.forEach(c => c.classList.remove('active-glow'));
+                stopRun();
             }
         }
 
-        function startSession() {
+        function startRun() {
             seconds = 0; totalDist = 0; steps = 0;
             timerInterval = setInterval(() => {
                 seconds++;
                 document.getElementById('timer').innerText = new Date(seconds * 1000).toISOString().substr(14, 5);
-                // 計算平均時速 (KM/H)
-                if (seconds > 0) {
-                    let speed = (totalDist / (seconds / 3600)).toFixed(1);
-                    document.getElementById('speedCount').innerText = speed;
+                if(seconds % 2 === 0 && totalDist > 0) {
+                    document.getElementById('speedCount').innerText = (totalDist / (seconds/3600)).toFixed(1);
                 }
             }, 1000);
 
-            watchID = navigator.geolocation.watchPosition((p) => {
+            watchID = navigator.geolocation.watchPosition(p => {
                 const { latitude, longitude, accuracy } = p.coords;
                 if (accuracy > 35) return;
-                document.getElementById('gpsText').innerText = "Tracking";
                 if (lastCoords) {
                     const d = calculate(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
-                    if (d > 0.002) { 
-                        totalDist += d; 
+                    if (d > 0.002) {
+                        totalDist += d;
                         document.getElementById('distCount').innerText = totalDist.toFixed(2);
-                        document.getElementById('calCount').innerText = Math.floor(totalDist * 65); // 估算熱量
+                        document.getElementById('calCount').innerText = Math.floor(totalDist * 65);
                     }
                 }
                 lastCoords = { latitude, longitude };
             }, null, { enableHighAccuracy: true });
 
-            window.addEventListener('devicemotion', motionHandler);
+            window.addEventListener('devicemotion', motion);
         }
 
-        function motionHandler(e) {
-            const acc = e.accelerationIncludingGravity;
+        function motion(e) {
+            let acc = e.accelerationIncludingGravity;
             let current = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
             let now = Date.now();
             if (Math.abs(current - lastAccel) > 13 && (now - lastStepTime > 260)) {
@@ -142,14 +143,17 @@
             lastAccel = current;
         }
 
-        function stopSession() {
+        function stopRun() {
             clearInterval(timerInterval);
             navigator.geolocation.clearWatch(watchID);
-            window.removeEventListener('devicemotion', motionHandler);
+            window.removeEventListener('devicemotion', motion);
             if (totalDist > 0 || steps > 5) {
-                history.unshift({ date: new Date().toLocaleDateString(), dist: totalDist, steps: steps, timestamp: Date.now() });
+                const today = new Date();
+                const dateStr = (today.getMonth()+1) + '/' + today.getDate();
+                history.unshift({ date: dateStr, dist: parseFloat(totalDist.toFixed(2)), steps: steps });
+                if(history.length > 10) history.pop();
                 localStorage.setItem('runHistory', JSON.stringify(history));
-                switchChart('day');
+                updateChart('day');
             }
         }
 
@@ -161,44 +165,39 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        function switchChart(mode) {
-            // 更新 UI 標籤
-            ['day', 'week', 'month'].forEach(m => {
-                document.getElementById('tab-'+m).className = m === mode ? 'px-3 py-1 text-[9px] rounded-lg transition-all tab-active' : 'px-3 py-1 text-[9px] rounded-lg transition-all text-gray-500';
-            });
-
+        function updateChart(mode) {
+            ['day', 'week', 'month'].forEach(m => document.getElementById('btn-'+m).className = m===mode ? 'tab-btn active' : 'tab-btn');
             const ctx = document.getElementById('runChart').getContext('2d');
-            let labels = [], data = [];
-
-            // 簡單模擬數據分類邏輯
-            const displayData = history.slice(0, 7).reverse();
-            labels = displayData.map(i => i.date.split('/')[1] + '/' + i.date.split('/')[2]);
-            data = displayData.map(i => i.dist);
-
+            const displayData = [...history].reverse();
+            
             if (myChart) myChart.destroy();
             myChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: labels,
+                    labels: displayData.map(d => d.date),
                     datasets: [{
-                        label: 'KM',
-                        data: data,
+                        label: 'Km',
+                        data: displayData.map(d => d.dist),
                         backgroundColor: '#34C759',
-                        borderRadius: 8,
-                        barThickness: 12
+                        borderRadius: 5,
+                        barThickness: 15
                     }]
                 },
                 options: {
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { grid: { display: false }, ticks: { color: '#444', font: { size: 8 } } },
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } }
+                        x: { grid: { display: false }, ticks: { color: '#555', font: { size: 9 } } },
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#555', font: { size: 8 }, stepSize: 1 }
+                        }
                     }
                 }
             });
         }
-        window.onload = () => switchChart('day');
+        window.onload = () => updateChart('day');
     </script>
 </body>
 </html>
