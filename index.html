@@ -3,64 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>極簡跑步追蹤</title>
+    <title>I-Running 2.0 (GPS版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0f172a; color: white; }
-        .stat-value { font-size: 3rem; font-weight: 800; color: #10b981; }
+        body { background-color: #0f172a; color: white; font-family: sans-serif; }
+        .stat-value { font-size: 3.5rem; font-weight: 800; color: #10b981; }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen p-6">
-    <div class="text-center mb-8">
-        <h1 class="text-2xl font-bold opacity-50">RUNNING TRACKER</h1>
+<body class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+    <div class="mb-8">
+        <h1 class="text-xl font-bold opacity-50 tracking-widest">RUNNING TRACKER 2.0</h1>
         <div id="timer" class="stat-value">00:00</div>
         <p class="text-gray-400">持續時間</p>
     </div>
 
-    <div class="grid grid-cols-2 gap-8 mb-12 w-full max-w-sm text-center">
+    <div class="grid grid-cols-2 gap-10 mb-12 w-full max-w-sm">
         <div>
-            <div id="distance" class="text-3xl font-bold">0.00</div>
-            <p class="text-gray-400 text-sm">公里 (估計)</p>
+            <div id="distance" class="text-4xl font-bold">0.000</div>
+            <p class="text-gray-400 text-sm mt-1">真實公里 (GPS)</p>
         </div>
         <div>
-            <div id="calories" class="text-3xl font-bold">0</div>
-            <p class="text-gray-400 text-sm">卡路里</p>
+            <div id="status" class="text-lg font-medium text-amber-400">準備中</div>
+            <p class="text-gray-400 text-sm mt-1">定位狀態</p>
         </div>
     </div>
 
-    <button id="mainBtn" onclick="toggleRun()" class="w-24 h-24 rounded-full bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
+    <button id="mainBtn" onclick="toggleRun()" class="w-28 h-28 rounded-full bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/30 active:scale-95 transition-all">
         START
     </button>
 
     <script>
         let running = false;
         let seconds = 0;
-        let interval;
+        let timerInterval;
+        let watchID;
+        let totalDistance = 0;
+        let lastCoords = null;
 
         function toggleRun() {
             const btn = document.getElementById('mainBtn');
-            running = !running;
+            const statusLabel = document.getElementById('status');
             
-            if (running) {
-                btn.innerText = 'STOP';
-                btn.classList.replace('bg-emerald-500', 'bg-red-500');
-                interval = setInterval(() => {
-                    seconds++;
-                    updateDisplay();
-                }, 1000);
+            if (!running) {
+                // 開始跑步
+                if ("geolocation" in navigator) {
+                    running = true;
+                    btn.innerText = 'STOP';
+                    btn.classList.replace('bg-emerald-500', 'bg-red-500');
+                    statusLabel.innerText = "追蹤中...";
+                    
+                    // 重設數據
+                    seconds = 0;
+                    totalDistance = 0;
+                    lastCoords = null;
+                    
+                    // 啟動計時器
+                    timerInterval = setInterval(() => {
+                        seconds++;
+                        updateTimerDisplay();
+                    }, 1000);
+
+                    // 啟動高精度 GPS 追蹤
+                    watchID = navigator.geolocation.watchPosition(
+                        (position) => {
+                            statusLabel.innerText = "GPS 訊號強";
+                            const { latitude, longitude } = position.coords;
+                            if (lastCoords) {
+                                const dist = calculateDistance(
+                                    lastCoords.latitude, lastCoords.longitude,
+                                    latitude, longitude
+                                );
+                                if (dist > 0.002) { // 過濾掉微小抖動
+                                    totalDistance += dist;
+                                    document.getElementById('distance').innerText = totalDistance.toFixed(3);
+                                }
+                            }
+                            lastCoords = { latitude, longitude };
+                        },
+                        (err) => {
+                            statusLabel.innerText = "定位失敗";
+                            console.error(err);
+                        },
+                        { enableHighAccuracy: true, distanceFilter: 1 }
+                    );
+                } else {
+                    alert("抱歉，您的手機不支援 GPS 定位");
+                }
             } else {
+                // 停止跑步
+                running = false;
                 btn.innerText = 'START';
                 btn.classList.replace('bg-red-500', 'bg-emerald-500');
-                clearInterval(interval);
+                statusLabel.innerText = "已停止";
+                clearInterval(timerInterval);
+                navigator.geolocation.clearWatch(watchID);
             }
         }
 
-        function updateDisplay() {
+        function updateTimerDisplay() {
             const m = Math.floor(seconds / 60).toString().padStart(2, '0');
             const s = (seconds % 60).toString().padStart(2, '0');
             document.getElementById('timer').innerText = `${m}:${s}`;
-            document.getElementById('distance').innerText = (seconds * 0.0025).toFixed(2);
-            document.getElementById('calories').innerText = Math.floor(seconds * 0.12);
+        }
+
+        // Haversine 公式計算兩點間公里數
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // 地球半徑 (km)
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
         }
     </script>
 </body>
