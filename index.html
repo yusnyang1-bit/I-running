@@ -3,152 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>I-Running 6.0 Data King</title>
+    <title>極簡跑步追蹤</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #0f172a; color: white; font-family: sans-serif; }
-        .card { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(255,255,255,0.05); border-radius: 1.2rem; }
-        .history-item { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 8px 0; }
+        body { background-color: #0f172a; color: white; }
+        .stat-value { font-size: 3rem; font-weight: 800; color: #10b981; }
     </style>
 </head>
-<body class="p-5 flex flex-col items-center min-h-screen">
-    
-    <div class="w-full max-w-sm flex justify-between items-center mb-6">
-        <span class="text-emerald-400 font-black text-[10px] tracking-tighter">I-RUNNING v6.0</span>
-        <div id="status" class="text-[9px] text-slate-500 font-mono">STANDBY</div>
+<body class="flex flex-col items-center justify-center min-h-screen p-6">
+    <div class="text-center mb-8">
+        <h1 class="text-2xl font-bold opacity-50">RUNNING TRACKER</h1>
+        <div id="timer" class="stat-value">00:00</div>
+        <p class="text-gray-400">持續時間</p>
     </div>
 
-    <div class="w-full max-w-sm grid grid-cols-2 gap-3 mb-4">
-        <div class="card p-5 text-center">
-            <div id="stepDisplay" class="text-4xl font-black">0</div>
-            <p class="text-[10px] text-slate-500 mt-1 uppercase">Steps</p>
+    <div class="grid grid-cols-2 gap-8 mb-12 w-full max-w-sm text-center">
+        <div>
+            <div id="distance" class="text-3xl font-bold">0.00</div>
+            <p class="text-gray-400 text-sm">公里 (估計)</p>
         </div>
-        <div class="card p-5 text-center border-l-2 border-l-emerald-500/30">
-            <div id="distDisplay" class="text-4xl font-black text-emerald-400">0.00</div>
-            <p class="text-[10px] text-slate-500 mt-1 uppercase">Km</p>
+        <div>
+            <div id="calories" class="text-3xl font-bold">0</div>
+            <p class="text-gray-400 text-sm">卡路里</p>
         </div>
     </div>
 
-    <div class="w-full max-w-sm flex items-center justify-between mb-8 px-2">
-        <div id="timer" class="text-xl font-mono text-slate-400 tracking-tighter">00:00</div>
-        <button id="mainBtn" onclick="toggleRun()" class="px-8 py-3 rounded-full bg-emerald-500 font-black text-sm shadow-lg active:scale-90 transition-all">START</button>
-    </div>
-
-    <div class="card w-full max-w-sm p-4 overflow-hidden">
-        <div class="h-24 mb-4"><canvas id="runChart"></canvas></div>
-        <h2 class="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Recent Activity / 歷史紀錄</h2>
-        <div id="historyList" class="text-xs text-slate-300 max-h-32 overflow-y-auto">
-            </div>
-    </div>
+    <button id="mainBtn" onclick="toggleRun()" class="w-24 h-24 rounded-full bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
+        START
+    </button>
 
     <script>
         let running = false;
-        let seconds = 0, timerInterval, watchID, totalDist = 0, lastCoords = null;
-        let steps = 0, lastAccel = 0, lastStepTime = 0;
-        let myChart;
-        let history = JSON.parse(localStorage.getItem('runHistory')) || [];
+        let seconds = 0;
+        let interval;
 
         function toggleRun() {
             const btn = document.getElementById('mainBtn');
-            if (!running) {
-                // 請求權限
-                if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                    DeviceMotionEvent.requestPermission().then(s => { if(s==='granted') start(); });
-                } else { start(); }
-            } else { stop(); }
-        }
-
-        function start() {
-            running = true;
-            document.getElementById('mainBtn').innerText = "FINISH";
-            document.getElementById('mainBtn').className = "px-8 py-3 rounded-full bg-red-500 font-black text-sm shadow-lg";
-            seconds = 0; totalDist = 0; steps = 0; lastCoords = null;
-            document.getElementById('stepDisplay').innerText = "0";
-            document.getElementById('distDisplay').innerText = "0.00";
+            running = !running;
             
-            timerInterval = setInterval(() => {
-                seconds++;
-                document.getElementById('timer').innerText = new Date(seconds * 1000).toISOString().substr(14, 5);
-            }, 1000);
-
-            watchID = navigator.geolocation.watchPosition((p) => {
-                const { latitude, longitude, accuracy } = p.coords;
-                if (accuracy > 30) return;
-                document.getElementById('status').innerText = "GPS ACTIVE";
-                if (lastCoords) {
-                    const d = calculate(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
-                    if (d > 0.002) { totalDist += d; document.getElementById('distDisplay').innerText = totalDist.toFixed(2); }
-                }
-                lastCoords = { latitude, longitude };
-            }, null, { enableHighAccuracy: true });
-
-            window.addEventListener('devicemotion', motionHandler);
-        }
-
-        function motionHandler(e) {
-            const acc = e.accelerationIncludingGravity;
-            let currentAccel = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
-            let now = Date.now();
-            // 優化演算法：震動幅度 > 13 且兩步之間間隔 > 250ms (防止手抖誤判)
-            if (Math.abs(currentAccel - lastAccel) > 13 && (now - lastStepTime > 250)) {
-                steps++;
-                lastStepTime = now;
-                document.getElementById('stepDisplay').innerText = steps;
-            }
-            lastAccel = currentAccel;
-        }
-
-        function stop() {
-            running = false;
-            document.getElementById('mainBtn').innerText = "START";
-            document.getElementById('mainBtn').className = "px-8 py-3 rounded-full bg-emerald-500 font-black text-sm shadow-lg";
-            clearInterval(timerInterval);
-            navigator.geolocation.clearWatch(watchID);
-            window.removeEventListener('devicemotion', motionHandler);
-            
-            if (totalDist > 0 || steps > 10) {
-                history.unshift({
-                    date: new Date().toLocaleDateString(),
-                    dist: totalDist.toFixed(2),
-                    steps: steps
-                });
-                if(history.length > 10) history.pop();
-                localStorage.setItem('runHistory', JSON.stringify(history));
-                renderUI();
+            if (running) {
+                btn.innerText = 'STOP';
+                btn.classList.replace('bg-emerald-500', 'bg-red-500');
+                interval = setInterval(() => {
+                    seconds++;
+                    updateDisplay();
+                }, 1000);
+            } else {
+                btn.innerText = 'START';
+                btn.classList.replace('bg-red-500', 'bg-emerald-500');
+                clearInterval(interval);
             }
         }
 
-        function calculate(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        function updateDisplay() {
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            document.getElementById('timer').innerText = `${m}:${s}`;
+            document.getElementById('distance').innerText = (seconds * 0.0025).toFixed(2);
+            document.getElementById('calories').innerText = Math.floor(seconds * 0.12);
         }
-
-        function renderUI() {
-            const list = document.getElementById('historyList');
-            list.innerHTML = history.map(i => `
-                <div class="history-item flex justify-between">
-                    <span>${i.date}</span>
-                    <span class="font-bold text-emerald-400">${i.dist} km / ${i.steps} 步</span>
-                </div>
-            `).join('');
-
-            const ctx = document.getElementById('runChart').getContext('2d');
-            if (myChart) myChart.destroy();
-            myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: history.map(i => i.date).reverse(),
-                    datasets: [{ data: history.map(i => i.dist).reverse(), borderColor: '#10b981', fill: true, backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.4 }]
-                },
-                options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
-            });
-        }
-
-        window.onload = renderUI;
     </script>
 </body>
 </html>
