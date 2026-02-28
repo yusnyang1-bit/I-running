@@ -3,34 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>I-Running 2.0 (GPS版)</title>
+    <title>I-Running 3.0 Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0f172a; color: white; font-family: sans-serif; }
-        .stat-value { font-size: 3.5rem; font-weight: 800; color: #10b981; }
+        body { background-color: #0f172a; color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .stat-value { font-size: 3.5rem; font-weight: 800; color: #10b981; line-height: 1; }
+        .card { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.5rem; }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
-    <div class="mb-8">
-        <h1 class="text-xl font-bold opacity-50 tracking-widest">RUNNING TRACKER 2.0</h1>
-        <div id="timer" class="stat-value">00:00</div>
-        <p class="text-gray-400">持續時間</p>
+<body class="flex flex-col items-center justify-between min-h-screen p-8 pb-12">
+    
+    <div class="w-full text-center mt-4">
+        <h1 class="text-xs font-black tracking-[0.3em] text-emerald-500 opacity-80 mb-1">PRO TRACKER</h1>
+        <div id="status" class="text-[10px] text-gray-500 uppercase tracking-widest">等待啟動 GPS</div>
     </div>
 
-    <div class="grid grid-cols-2 gap-10 mb-12 w-full max-w-sm">
-        <div>
-            <div id="distance" class="text-4xl font-bold">0.000</div>
-            <p class="text-gray-400 text-sm mt-1">真實公里 (GPS)</p>
+    <div class="text-center">
+        <div id="timer" class="stat-value mb-2">00:00</div>
+        <p class="text-gray-400 text-xs tracking-widest uppercase">Duration / 持續時間</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 w-full max-w-sm">
+        <div class="card p-6 text-center">
+            <div id="distance" class="text-3xl font-bold text-white">0.00</div>
+            <p class="text-gray-500 text-[10px] mt-1 uppercase tracking-wider">Distance / 公里</p>
         </div>
-        <div>
-            <div id="status" class="text-lg font-medium text-amber-400">準備中</div>
-            <p class="text-gray-400 text-sm mt-1">定位狀態</p>
+        <div class="card p-6 text-center">
+            <div id="calories" class="text-3xl font-bold text-white">0</div>
+            <p class="text-gray-500 text-[10px] mt-1 uppercase tracking-wider">Calories / 卡路里</p>
         </div>
     </div>
 
-    <button id="mainBtn" onclick="toggleRun()" class="w-28 h-28 rounded-full bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/30 active:scale-95 transition-all">
-        START
-    </button>
+    <div class="flex flex-col items-center gap-4 w-full">
+        <button id="mainBtn" onclick="toggleRun()" class="w-24 h-24 rounded-full bg-emerald-500 text-white font-black text-lg shadow-[0_0_30px_rgba(16,185,129,0.3)] active:scale-90 transition-all duration-300">
+            START
+        </button>
+        <p class="text-[10px] text-gray-600 italic">Version 3.0 - GPS Enabled</p>
+    </div>
 
     <script>
         let running = false;
@@ -45,70 +54,72 @@
             const statusLabel = document.getElementById('status');
             
             if (!running) {
-                // 開始跑步
+                // 開始
                 if ("geolocation" in navigator) {
                     running = true;
                     btn.innerText = 'STOP';
                     btn.classList.replace('bg-emerald-500', 'bg-red-500');
-                    statusLabel.innerText = "追蹤中...";
+                    btn.classList.add('shadow-[0_0_30px_rgba(239,68,68,0.3)]');
+                    statusLabel.innerText = "正在搜尋 GPS 訊號...";
                     
-                    // 重設數據
+                    // 重置
                     seconds = 0;
                     totalDistance = 0;
                     lastCoords = null;
-                    
-                    // 啟動計時器
+                    document.getElementById('distance').innerText = "0.00";
+                    document.getElementById('calories').innerText = "0";
+
                     timerInterval = setInterval(() => {
                         seconds++;
-                        updateTimerDisplay();
+                        updateUI();
                     }, 1000);
 
-                    // 啟動高精度 GPS 追蹤
                     watchID = navigator.geolocation.watchPosition(
                         (position) => {
-                            statusLabel.innerText = "GPS 訊號強";
-                            const { latitude, longitude } = position.coords;
+                            statusLabel.innerText = "GPS 訊號追蹤中";
+                            const { latitude, longitude, accuracy } = position.coords;
+                            
+                            // 如果定位精度太差 (> 30公尺)，先忽略這次數據
+                            if (accuracy > 30) return;
+
                             if (lastCoords) {
                                 const dist = calculateDistance(
                                     lastCoords.latitude, lastCoords.longitude,
                                     latitude, longitude
                                 );
-                                if (dist > 0.002) { // 過濾掉微小抖動
+                                // 過濾小於 2 公尺的抖動，避免原地不動里程也會增加
+                                if (dist > 0.002) {
                                     totalDistance += dist;
-                                    document.getElementById('distance').innerText = totalDistance.toFixed(3);
+                                    document.getElementById('distance').innerText = totalDistance.toFixed(2);
+                                    // 估算卡路里：體重 70kg 跑 1km 約消耗 70 大卡
+                                    document.getElementById('calories').innerText = Math.floor(totalDistance * 70);
                                 }
                             }
                             lastCoords = { latitude, longitude };
                         },
-                        (err) => {
-                            statusLabel.innerText = "定位失敗";
-                            console.error(err);
-                        },
+                        (err) => { statusLabel.innerText = "GPS 授權失敗"; },
                         { enableHighAccuracy: true, distanceFilter: 1 }
                     );
-                } else {
-                    alert("抱歉，您的手機不支援 GPS 定位");
                 }
             } else {
-                // 停止跑步
+                // 停止
                 running = false;
                 btn.innerText = 'START';
                 btn.classList.replace('bg-red-500', 'bg-emerald-500');
-                statusLabel.innerText = "已停止";
+                statusLabel.innerText = "運動已結束";
                 clearInterval(timerInterval);
                 navigator.geolocation.clearWatch(watchID);
             }
         }
 
-        function updateTimerDisplay() {
+        function updateUI() {
             const m = Math.floor(seconds / 60).toString().padStart(2, '0');
             const s = (seconds % 60).toString().padStart(2, '0');
             document.getElementById('timer').innerText = `${m}:${s}`;
         }
 
-        // Haversine 公式計算兩點間公里數
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // 地球半徑 (km)
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
