@@ -1,196 +1,72 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>I-Running Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root { --bg: #050505; --card: rgba(28, 28, 30, 0.7); --accent: #34C759; }
-        body { background-color: var(--bg); color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica; -webkit-font-smoothing: antialiased; }
-        .glass { background: var(--card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); }
-        .pulse { animation: pulse-animation 2s infinite; }
-        @keyframes pulse-animation { 0% { box-shadow: 0 0 0 0px rgba(52, 199, 89, 0.4); } 100% { box-shadow: 0 0 0 20px rgba(52, 199, 89, 0); } }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        canvas { filter: drop-shadow(0px 10px 10px rgba(52, 199, 89, 0.1)); }
-    </style>
-</head>
-<body class="flex flex-col min-h-screen px-6 py-10 hide-scrollbar">
-
-    <header class="flex justify-between items-center mb-10">
+<div class="grid grid-cols-2 gap-4 w-full mb-6">
+    <div class="glass p-4 rounded-3xl flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-black tracking-tight">I-RUNNING</h1>
-            <p class="text-[10px] text-gray-500 font-bold tracking-[0.2em] uppercase">Premium Edition</p>
+            <p class="text-[9px] text-gray-500 font-bold uppercase">Calories</p>
+            <span id="kcalDisplay" class="text-xl font-black tabular-nums">0</span>
         </div>
-        <div class="flex items-center gap-2 glass px-3 py-1.5 rounded-full">
-            <div id="statusDot" class="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
-            <span id="statusText" class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Standby</span>
+        <div class="text-[#FF9500]">🔥</div>
+    </div>
+    <div class="glass p-4 rounded-3xl flex items-center justify-between">
+        <div>
+            <p class="text-[9px] text-gray-500 font-bold uppercase">Avg Speed</p>
+            <span id="speedDisplay" class="text-xl font-black tabular-nums">0.0</span>
         </div>
-    </header>
+        <div class="text-[#007AFF]">⚡</div>
+    </div>
+</div>
 
-    <main class="flex-grow flex flex-col items-center">
-        <div class="text-center mb-12">
-            <span id="timer" class="text-6xl font-light tracking-tighter tabular-nums">00:00</span>
-            <p class="text-[10px] text-gray-500 mt-2 font-bold tracking-[0.3em] uppercase">Duration</p>
+<section class="mt-4">
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Analytics</h3>
+        <div class="flex gap-2 glass p-1 rounded-xl">
+            <button onclick="updateChart('day')" class="tab-btn px-3 py-1 text-[10px] font-bold rounded-lg bg-[#34C759] text-black transition-all">DAY</button>
+            <button onclick="updateChart('week')" class="tab-btn px-3 py-1 text-[10px] font-bold rounded-lg text-gray-400">WEEK</button>
+            <button onclick="updateChart('month')" class="tab-btn px-3 py-1 text-[10px] font-bold rounded-lg text-gray-400">MONTH</button>
         </div>
-
-        <div class="grid grid-cols-2 gap-4 w-full mb-10">
-            <div class="glass p-6 rounded-[2rem] text-center">
-                <span id="stepDisplay" class="text-4xl font-bold tabular-nums">0</span>
-                <p class="text-[10px] text-gray-500 mt-2 font-bold uppercase">Steps</p>
-            </div>
-            <div class="glass p-6 rounded-[2rem] text-center">
-                <span id="distDisplay" class="text-4xl font-bold text-[#34C759] tabular-nums">0.00</span>
-                <p class="text-[10px] text-gray-500 mt-2 font-bold uppercase">Km</p>
-            </div>
+    </div>
+    
+    <div class="glass p-5 rounded-[2.5rem] mb-6 relative overflow-hidden">
+        <div class="h-40 w-full">
+            <canvas id="runChart"></canvas>
         </div>
+    </div>
+</section>
 
-        <button id="mainBtn" onclick="toggleRun()" class="w-24 h-24 rounded-full bg-[#34C759] text-black font-black text-sm transition-all active:scale-90 shadow-2xl z-10">
-            START
-        </button>
-    </main>
-
-    <section class="mt-10">
-        <div class="flex justify-between items-end mb-4">
-            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Recent Activity</h3>
-            <span class="text-[10px] text-[#34C759] font-bold">Total: 7 Days</span>
-        </div>
+<script>
+    // 新增核心邏輯片段
+    function updateMetrics() {
+        // 卡路里：假設 70kg, 1km 消耗約 72大卡
+        const kcal = (totalDist * 72.5).toFixed(1);
+        document.getElementById('kcalDisplay').innerText = kcal;
         
-        <div class="glass p-5 rounded-[2rem] mb-6">
-            <div class="h-32 w-full">
-                <canvas id="runChart"></canvas>
-            </div>
-        </div>
+        // 時速：km/h
+        const speed = seconds > 0 ? (totalDist / (seconds / 3600)).toFixed(1) : "0.0";
+        document.getElementById('speedDisplay').innerText = speed;
+    }
 
-        <div id="historyList" class="space-y-3 pb-10">
-            </div>
-    </section>
+    // 增強型 Chart 配置 (柱狀圖 + 動態切換)
+    function updateChart(period) {
+        // 切換 UI 樣式
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.className = 'tab-btn px-3 py-1 text-[10px] font-bold rounded-lg text-gray-400';
+        });
+        event.target.className = 'tab-btn px-3 py-1 text-[10px] font-bold rounded-lg bg-[#34C759] text-black';
 
-    <script>
-        let running = false;
-        let seconds = 0, timerInterval, watchID, totalDist = 0, lastCoords = null;
-        let steps = 0, lastAccel = 0, lastStepTime = 0;
-        let myChart;
-        let history = JSON.parse(localStorage.getItem('runHistory')) || [];
+        // 模擬數據（實際開發可從 DB 統計）
+        const mockData = {
+            day: { labels: ['6am', '10am', '2pm', '6pm', '10pm'], data: [0, 2.4, 1.1, 4.5, 0.5] },
+            week: { labels: ['M', 'T', 'W', 'T', 'F', 'S', 'S'], data: [5, 8, 4, 10, 6, 12, 15] },
+            month: { labels: ['W1', 'W2', 'W3', 'W4'], data: [45, 52, 38, 65] }
+        };
 
-        function toggleRun() {
-            const btn = document.getElementById('mainBtn');
-            const dot = document.getElementById('statusDot');
-            const status = document.getElementById('statusText');
-
-            if (!running) {
-                running = true;
-                btn.innerText = 'STOP';
-                btn.className = 'w-24 h-24 rounded-full bg-red-500 text-white font-black text-sm transition-all active:scale-90 shadow-2xl z-10';
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-[#34C759] pulse';
-                status.innerText = 'Tracking';
-                startSession();
-            } else {
-                running = false;
-                btn.innerText = 'START';
-                btn.className = 'w-24 h-24 rounded-full bg-[#34C759] text-black font-black text-sm transition-all active:scale-90 shadow-2xl z-10';
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-orange-500';
-                status.innerText = 'Saved';
-                stopSession();
-            }
-        }
-
-        function startSession() {
-            seconds = 0; totalDist = 0; steps = 0; lastCoords = null;
-            document.getElementById('stepDisplay').innerText = "0";
-            document.getElementById('distDisplay').innerText = "0.00";
-            
-            timerInterval = setInterval(() => {
-                seconds++;
-                document.getElementById('timer').innerText = new Date(seconds * 1000).toISOString().substr(14, 5);
-            }, 1000);
-
-            watchID = navigator.geolocation.watchPosition((p) => {
-                const { latitude, longitude, accuracy } = p.coords;
-                if (accuracy > 30) return;
-                if (lastCoords) {
-                    const d = calculate(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
-                    if (d > 0.002) { 
-                        totalDist += d; 
-                        document.getElementById('distDisplay').innerText = totalDist.toFixed(2); 
-                    }
-                }
-                lastCoords = { latitude, longitude };
-            }, null, { enableHighAccuracy: true });
-
-            window.addEventListener('devicemotion', motionHandler);
-        }
-
-        function motionHandler(e) {
-            const acc = e.accelerationIncludingGravity;
-            let currentAccel = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
-            let now = Date.now();
-            if (Math.abs(currentAccel - lastAccel) > 13 && (now - lastStepTime > 260)) {
-                steps++;
-                lastStepTime = now;
-                document.getElementById('stepDisplay').innerText = steps;
-            }
-            lastAccel = currentAccel;
-        }
-
-        function stopSession() {
-            clearInterval(timerInterval);
-            navigator.geolocation.clearWatch(watchID);
-            window.removeEventListener('devicemotion', motionHandler);
-            
-            if (totalDist > 0 || steps > 5) {
-                history.unshift({ date: new Date().toLocaleDateString('zh-TW', {month:'short', day:'numeric'}), dist: totalDist.toFixed(2), steps: steps });
-                if(history.length > 7) history.pop();
-                localStorage.setItem('runHistory', JSON.stringify(history));
-                renderUI();
-            }
-        }
-
-        function calculate(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        function renderUI() {
-            const list = document.getElementById('historyList');
-            list.innerHTML = history.map(i => `
-                <div class="glass flex justify-between items-center p-5 rounded-2xl animate-fade-in">
-                    <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">${i.date}</span>
-                    <div class="text-right">
-                        <span class="text-sm font-black text-white">${i.dist} <span class="text-[9px] text-gray-500 font-normal">KM</span></span>
-                        <span class="ml-3 text-sm font-black text-gray-400">${i.steps} <span class="text-[9px] text-gray-500 font-normal">STEPS</span></span>
-                    </div>
-                </div>
-            `).join('');
-
-            const ctx = document.getElementById('runChart').getContext('2d');
-            if (myChart) myChart.destroy();
-            myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: history.map(i => i.date).reverse(),
-                    datasets: [{ 
-                        data: history.map(i => i.dist).reverse(), 
-                        borderColor: '#34C759', 
-                        borderWidth: 3,
-                        fill: true, 
-                        backgroundColor: 'rgba(52, 199, 89, 0.05)', 
-                        tension: 0.4,
-                        pointRadius: 0
-                    }]
-                },
-                options: { 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { x: { display: false }, y: { display: false, beginAtZero: true } } 
-                }
-            });
-        }
-        window.onload = renderUI;
-    </script>
-</body>
-</html>
+        const config = mockData[period];
+        
+        myChart.data.labels = config.labels;
+        myChart.data.datasets[0].data = config.data;
+        myChart.data.datasets[0].type = 'bar'; // 改為柱狀圖增加視覺衝擊
+        myChart.update({
+            duration: 800,
+            easing: 'easeOutQuart'
+        });
+    }
+</script>
